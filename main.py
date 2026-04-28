@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 import httpx
 import os
 
 app = FastAPI(title="Telegram Agent")
-client = Anthropic()
+client = AsyncAnthropic()
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -23,7 +23,7 @@ async def webhook(request: Request):
 
 
 async def generate_reply(user_message: str) -> str:
-    response = client.messages.create(
+    response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=300,
         system=(
