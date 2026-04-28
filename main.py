@@ -1,33 +1,24 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, Request
+from anthropic import Anthropic
 import httpx
 import os
-from anthropic import Anthropic
 
-app = FastAPI(title="Messenger Agent")
+app = FastAPI(title="Telegram Agent")
 client = Anthropic()
 
-FB_VERIFY_TOKEN = os.environ["FB_VERIFY_TOKEN"]
-FB_PAGE_TOKEN = os.environ["FB_PAGE_TOKEN"]
-
-
-@app.get("/webhook")
-async def verify(hub_mode: str = None, hub_challenge: str = None, hub_verify_token: str = None):
-    if hub_mode == "subscribe" and hub_verify_token == FB_VERIFY_TOKEN:
-        return PlainTextResponse(hub_challenge)
-    raise HTTPException(status_code=403)
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
 @app.post("/webhook")
 async def webhook(request: Request):
     body = await request.json()
-    for entry in body.get("entry", []):
-        for event in entry.get("messaging", []):
-            sender_id = event["sender"]["id"]
-            text = event.get("message", {}).get("text", "")
-            if text:
-                reply = await generate_reply(text)
-                await send_message(sender_id, reply)
+    message = body.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+    text = message.get("text", "")
+    if chat_id and text:
+        reply = await generate_reply(text)
+        await send_message(chat_id, reply)
     return {"status": "ok"}
 
 
@@ -45,10 +36,20 @@ async def generate_reply(user_message: str) -> str:
     return response.content[0].text
 
 
-async def send_message(recipient_id: str, text: str):
+async def send_message(chat_id: int, text: str):
     async with httpx.AsyncClient() as http:
         await http.post(
-            "https://graph.facebook.com/v21.0/me/messages",
-            params={"access_token": FB_PAGE_TOKEN},
-            json={"recipient": {"id": recipient_id}, "message": {"text": text}},
+            f"{TELEGRAM_API}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
         )
+
+
+@app.on_event("startup")
+async def set_webhook():
+    url = os.environ.get("WEBHOOK_URL", "")
+    if url:
+        async with httpx.AsyncClient() as http:
+            await http.post(
+                f"{TELEGRAM_API}/setWebhook",
+                json={"url": f"{url}/webhook"},
+            )
