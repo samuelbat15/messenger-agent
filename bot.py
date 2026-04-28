@@ -1,13 +1,10 @@
 import os
 import time
 import httpx
-from anthropic import Anthropic
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
 offset = 0
 
 
@@ -22,17 +19,27 @@ def send_message(chat_id, text):
 
 
 def generate_reply(text):
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=300,
-        system=(
-            "Tu es un assistant pour une PME locale. "
-            "Réponds de façon concise, chaleureuse et professionnelle. "
-            "Pour les réservations, demande : nom, date, heure, nombre de personnes."
-        ),
-        messages=[{"role": "user", "content": text}],
+    r = httpx.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 300,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Tu es un assistant pour une PME locale. "
+                        "Réponds de façon concise, chaleureuse et professionnelle. "
+                        "Pour les réservations, demande : nom, date, heure, nombre de personnes."
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+        },
+        timeout=15,
     )
-    return response.content[0].text
+    return r.json()["choices"][0]["message"]["content"]
 
 
 def main():
