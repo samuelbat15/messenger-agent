@@ -10,7 +10,7 @@ offset = 0
 
 def get_updates():
     global offset
-    r = httpx.get(f"{TELEGRAM_API}/getUpdates", params={"offset": offset, "timeout": 30})
+    r = httpx.get(f"{TELEGRAM_API}/getUpdates", params={"offset": offset, "timeout": 30}, timeout=35)
     return r.json().get("result", [])
 
 
